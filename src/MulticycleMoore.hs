@@ -1,5 +1,6 @@
 module MulticycleMoore
-  ( map0
+  ( delay'
+  , map0
   , map'
   , foldl0
   , foldr0
@@ -35,6 +36,22 @@ counter :: forall n dom. (KnownNat n, 1 <= n, HiddenClockResetEnable dom)
 counter resetTrigger trigger = mux trigger n' n where
   n = regEn maxBound trigger n'
   n' = mux resetTrigger 0 $ incr maxBound <$> n
+
+--
+
+delay' :: forall m n dom
+        . ( KnownNat n
+          , 1 <= n
+          , HiddenClockResetEnable dom
+          )
+       => DSignal dom m Bool
+       -> DSignal dom (m + n) Bool
+delay' trigger = unsafeFromSignal trigger' where
+  s 0 False = 0
+  s i b = if i < maxBound then i + 1 else if b then 1 else 0
+  o = (maxBound ==)
+  z = 0 :: Index (n + 1)
+  trigger' = moore s o z $ toSignal trigger
 
 -- | map0 & map'
 -- >>> f a b = a * b
