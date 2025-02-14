@@ -1,5 +1,7 @@
 module MulticycleMoore
   ( delay'
+  , unsafeLatch0
+  , latch'
   , map0
   , map'
   , foldl0
@@ -52,6 +54,33 @@ delay' trigger = unsafeFromSignal trigger' where
   o = (maxBound ==)
   z = 0 :: Index (n + 1)
   trigger' = moore s o z $ toSignal trigger
+
+--
+
+unsafeLatch0 :: forall l m a dom
+              . ( NFDataX a
+              , HiddenClockResetEnable dom
+              )
+             => DSignal dom m Bool
+             -> DSignal dom m a
+             -> DSignal dom (m + l) a
+unsafeLatch0 trigger' din' = dout' where
+  rout = register undefined rin
+  rin = mux (toSignal trigger') (toSignal din') rout
+  dout' = unsafeFromSignal rin
+
+latch' :: forall l m a dom
+        . ( 1 <= l
+          , NFDataX a
+          , HiddenClockResetEnable dom
+          )
+       => DSignal dom m Bool
+       -> DSignal dom m a
+       -> DSignal dom (m + l) a
+latch' trigger' din' = dout' where
+  rout = register undefined rin
+  rin = mux (toSignal trigger') (toSignal din') rout
+  dout' = unsafeFromSignal rout
 
 -- | map0 & map'
 -- >>> f a b = a * b
