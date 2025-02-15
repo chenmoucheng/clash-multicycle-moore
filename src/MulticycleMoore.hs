@@ -41,7 +41,7 @@ counter resetTrigger trigger = mux trigger n' n where
 
 --
 
-delay' :: forall m n dom
+delay' :: forall n m dom
         . ( KnownNat n
           , 1 <= n
           , HiddenClockResetEnable dom
@@ -178,7 +178,7 @@ fold' lr f' trigger' b0' as' = unsafeFromSignal b' where
   i = counter @(n + 1) trigger tr
   iLTn = (maxBound >) <$> i
   b' = toSignal $ f' (fromSignal $ tr .&&. iLTn) (fromSignal a) (fromSignal b)
-  b = mux ((0 ==) <$> i) (toSignal b0') b'
+  b = mux ((0 ==) <$> i) (toSignal b0') . toSignal $ unsafeLatch0 (fromSignal tr) (fromSignal b')
   a = mux iLTn (liftA2 (!!) (toSignal as') j) $ pure undefined
   j = (\ k -> if lr == Left () then k else maxBound - 1 - k) <$> i
 
