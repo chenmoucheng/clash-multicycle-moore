@@ -1,6 +1,6 @@
-cabal-version:       2.4
+cabal-version:       3.0
 name:                clash-multicycle-moore
-version:             0.1
+version:             0.2
 license:             MIT
 author:              Chen-Mou Cheng <chenmou.cheng@gmail.com>
 maintainer:          Chen-Mou Cheng <chenmou.cheng@gmail.com>
@@ -75,7 +75,7 @@ common common-options
     Cabal,
 
     -- clash-prelude will set suitable version bounds for the plugins
-    clash-prelude >= 1.8.2 && < 1.10,
+    clash-prelude,
     ghc-typelits-natnormalise,
     ghc-typelits-extra,
     ghc-typelits-knownnat
@@ -113,7 +113,7 @@ test-suite doctests
   build-depends:
     base,
     clash-multicycle-moore,
-    doctest-parallel >= 0.2 && < 0.4,
+    doctest-parallel
 
 test-suite test-library
   import: common-options
@@ -129,6 +129,6 @@ test-suite test-library
     QuickCheck,
     clash-prelude-hedgehog,
     hedgehog,
-    tasty >= 1.2 && < 1.6,
+    tasty,
     tasty-hedgehog,
     tasty-th

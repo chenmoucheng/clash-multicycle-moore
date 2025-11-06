@@ -1,6 +1,7 @@
 module MulticycleMoore
-  ( delay'
-  , unsafeLatch0
+  ( const'
+  , delay'
+  , unsafeLatch
   , latch'
   , map0
   , map'
@@ -11,7 +12,7 @@ module MulticycleMoore
   ) where
 
 import Data.Proxy (Proxy(..))
-import Clash.Prelude
+import Clash.Prelude hiding (foldl')
 
 -- $
 
@@ -23,23 +24,31 @@ import Clash.Prelude
 incr :: forall n. (KnownNat n) => Index n -> Index n -> Index n
 incr z i = if i < maxBound then i + 1 else z
 
-prescaler :: forall d dom. (KnownNat d, 1 <= d, HiddenClockResetEnable dom)
+unsafePrescaler :: forall d dom. (KnownNat d, 1 <= d, HiddenClockResetEnable dom)
           => Proxy d
           -> Signal dom Bool
           -> Signal dom Bool
-prescaler _ resetTrigger = resetTrigger .||. (0 ==) <$> d where
+unsafePrescaler _ resetTrigger = resetTrigger .||. (0 ==) <$> d where
   d = register 0 d' :: Signal dom (Index d)
   d' = mux resetTrigger (incr 0 <$> 0) (incr 0 <$> d)
 
-counter :: forall n dom. (KnownNat n, 1 <= n, HiddenClockResetEnable dom)
+unsafeCounter :: forall n dom. (KnownNat n, 1 <= n, HiddenClockResetEnable dom)
         => Signal dom Bool
         -> Signal dom Bool
         -> Signal dom (Index n)
-counter resetTrigger trigger = mux trigger n' n where
+unsafeCounter resetTrigger trigger = mux trigger n' n where
   n = regEn maxBound trigger n'
   n' = mux resetTrigger 0 $ incr maxBound <$> n
 
 --
+
+const' :: forall l m a b dom. (HiddenClockResetEnable dom)
+       => (DSignal dom m Bool -> DSignal dom m b -> DSignal dom (m + l) b)
+       -> DSignal dom m Bool
+       -> DSignal dom m a
+       -> DSignal dom m b
+       -> DSignal dom (m + l) b
+const' cir trigger _ = cir trigger
 
 delay' :: forall n m dom
         . ( KnownNat n
@@ -57,14 +66,14 @@ delay' trigger = unsafeFromSignal trigger' where
 
 --
 
-unsafeLatch0 :: forall l m a dom
-              . ( NFDataX a
-              , HiddenClockResetEnable dom
-              )
-             => DSignal dom m Bool
-             -> DSignal dom m a
-             -> DSignal dom (m + l) a
-unsafeLatch0 trigger' din' = dout' where
+unsafeLatch :: forall l m a dom
+             . ( NFDataX a
+               , HiddenClockResetEnable dom
+               )
+            => DSignal dom m Bool
+            -> DSignal dom m a
+            -> DSignal dom (m + l) a
+unsafeLatch trigger' din' = dout' where
   rout = register undefined rin
   rin = mux (toSignal trigger') (toSignal din') rout
   dout' = unsafeFromSignal rin
@@ -132,8 +141,8 @@ map' :: forall l m n d a b dom
      -> DSignal dom (m + (n * d + 1) + l) (Vec n b)
 map' f' trigger' a' bsin' = unsafeFromSignal bs' where
   trigger = toSignal trigger'
-  tr = prescaler @d Proxy trigger
-  i = counter @(n + 1) trigger tr
+  tr = unsafePrescaler @d Proxy trigger
+  i = unsafeCounter @(n + 1) trigger tr
   iLTn = (maxBound >) <$> i
   b' = toSignal $ f' (fromSignal $ tr .&&. iLTn) (fromSignal $ toSignal a') (fromSignal b)
   b = mux iLTn (liftA2 (!!) bs i) $ pure undefined
@@ -174,11 +183,11 @@ fold' :: forall l m n d a b dom
       -> DSignal dom (m + n * d + l) b
 fold' lr f' trigger' b0' as' = unsafeFromSignal b' where
   trigger = toSignal trigger'
-  tr = prescaler @d Proxy trigger
-  i = counter @(n + 1) trigger tr
+  tr = unsafePrescaler @d Proxy trigger
+  i = unsafeCounter @(n + 1) trigger tr
   iLTn = (maxBound >) <$> i
   b' = toSignal $ f' (fromSignal $ tr .&&. iLTn) (fromSignal a) (fromSignal b)
-  b = mux ((0 ==) <$> i) (toSignal b0') . toSignal $ unsafeLatch0 (fromSignal tr) (fromSignal b')
+  b = mux ((0 ==) <$> i) (toSignal b0') . toSignal $ unsafeLatch (fromSignal tr) (fromSignal b')
   a = mux iLTn (liftA2 (!!) (toSignal as') j) $ pure undefined
   j = (\ k -> if lr == Left () then k else maxBound - 1 - k) <$> i
 
